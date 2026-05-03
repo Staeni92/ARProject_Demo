@@ -1,0 +1,46 @@
+# Unreal Engine generated files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Build products and caches
+Build/Receipts/
+Build/**/FileOpenOrder/
+Build/**/ShaderDebugInfo/
+*.target
+*.modules
+*.version
+
+# Logs, dumps, and temporary files
+*.log
+*.tmp
+*.temp
+*.dmp
+*.crash
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.xcodeproj/
+*.xcworkspace/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Rider
+.idea/
+*.sln.iml
+
+# Visual Studio Code workspace settings can be local-only unless intentionally shared.
+*.code-workspace
