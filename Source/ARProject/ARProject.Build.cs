@@ -10,7 +10,15 @@ public class ARProject : ModuleRules
 		{
 			"Core",
 			"CoreUObject",
-			"Engine"
+			"Engine",
+			"AugmentedReality",
+			"ProceduralMeshComponent",
+			"UMG",
+			"Slate",
+			"SlateCore",
+			"AudioMixer",
+			"ImageWrapper",
+			"RenderCore"
 		});
 	}
 }

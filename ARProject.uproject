@@ -21,6 +21,10 @@
 				"Linux",
 				"Android"
 			]
+		},
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [
