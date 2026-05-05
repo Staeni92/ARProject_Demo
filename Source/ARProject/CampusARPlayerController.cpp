@@ -36,9 +36,11 @@ ACampusARPlayerController::ACampusARPlayerController()
 	ScaleAtPinchStart = 1.0f;
 	CurrentCardScale = 1.0f;
 	EmblemScaleAtPinchStart = 1.0f;
+	EncyclopediaScaleAtPinchStart = 1.0f;
 	YawOffsetDegrees = 0.0f;
 	YawAtPinchStart = 0.0f;
 	EmblemYawAtPinchStart = 0.0f;
+	EncyclopediaYawAtPinchStart = 0.0f;
 	AccumulatedTouchMove = 0.0f;
 	CardLocalOffset = FVector::ZeroVector;
 	LatestImageTransform = FTransform::Identity;
@@ -213,6 +215,7 @@ void ACampusARPlayerController::UpdateTouchInput()
 		const float CurrentDistance = FVector2D::Distance(Touch1, Touch2);
 		const FVector2D CurrentPinchVector = Touch2 - Touch1;
 		const bool bManipulateEmblemModel = CampusCard && CampusCard->IsEmblemPage();
+		const bool bManipulateEncyclopediaWidget = CampusCard && CampusCard->IsEncyclopediaPage();
 		if (!bWasTouch2Down)
 		{
 			LastPinchDistance = CurrentDistance;
@@ -223,6 +226,8 @@ void ACampusARPlayerController::UpdateTouchInput()
 			{
 				EmblemScaleAtPinchStart = CampusCard->GetEmblemModelScale();
 				EmblemYawAtPinchStart = CampusCard->GetEmblemModelYaw();
+				EncyclopediaScaleAtPinchStart = CampusCard->GetEncyclopediaWidgetScale();
+				EncyclopediaYawAtPinchStart = CampusCard->GetEncyclopediaWidgetYaw();
 			}
 		}
 		else if (CampusCard && LastPinchDistance > 1.0f)
@@ -231,6 +236,10 @@ void ACampusARPlayerController::UpdateTouchInput()
 			if (bManipulateEmblemModel)
 			{
 				CampusCard->SetEmblemModelScale(EmblemScaleAtPinchStart * ScaleFactor);
+			}
+			else if (bManipulateEncyclopediaWidget)
+			{
+				CampusCard->SetEncyclopediaWidgetScale(EncyclopediaScaleAtPinchStart * ScaleFactor);
 			}
 			else
 			{
@@ -245,13 +254,17 @@ void ACampusARPlayerController::UpdateTouchInput()
 				{
 					CampusCard->SetEmblemModelYaw(EmblemYawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot)));
 				}
+				else if (bManipulateEncyclopediaWidget)
+				{
+					CampusCard->SetEncyclopediaWidgetYaw(EncyclopediaYawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot)));
+				}
 				else
 				{
 					YawOffsetDegrees = YawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot));
 				}
 			}
 
-			if (!bManipulateEmblemModel)
+			if (!bManipulateEmblemModel && !bManipulateEncyclopediaWidget)
 			{
 				ApplyCampusCardManipulation();
 			}
@@ -375,11 +388,15 @@ void ACampusARPlayerController::ResetCampusCardManipulation()
 	YawAtPinchStart = 0.0f;
 	EmblemScaleAtPinchStart = 1.0f;
 	EmblemYawAtPinchStart = 0.0f;
+	EncyclopediaScaleAtPinchStart = 1.0f;
+	EncyclopediaYawAtPinchStart = 0.0f;
 	CurrentCardScale = bHasLatestImageTransform ? LatestImageTransform.GetScale3D().X : DefaultCampusCardScale;
 	if (CampusCard)
 	{
 		CampusCard->SetEmblemModelScale(1.0f);
 		CampusCard->SetEmblemModelYaw(0.0f);
+		CampusCard->SetEncyclopediaWidgetScale(1.0f);
+		CampusCard->SetEncyclopediaWidgetYaw(0.0f);
 	}
 	ApplyCampusCardManipulation();
 }

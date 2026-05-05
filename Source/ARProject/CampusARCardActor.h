@@ -22,8 +22,9 @@ enum class ECampusCardPage : uint8
 	Profile,
 	Website,
 	Emblem,
-	Custom
+	Encyclopedia
 };
+
 
 UCLASS()
 class ARPROJECT_API ACampusARCardActor : public AActor
@@ -42,11 +43,16 @@ public:
 	bool HandleWorldTap(const FVector& RayStart, const FVector& RayEnd, bool* bOutResetRequested = nullptr);
 	void SetProfilePhoto(UTexture2D* PhotoTexture);
 	bool IsEmblemPage() const;
+	bool IsEncyclopediaPage() const;
 	float GetEmblemModelScale() const;
 	float GetEmblemModelYaw() const;
 	void SetEmblemModelScale(float NewScale);
 	void SetEmblemModelYaw(float NewYawDegrees);
 	void AddEmblemModelYaw(float DeltaDegrees);
+	float GetEncyclopediaWidgetScale() const;
+	float GetEncyclopediaWidgetYaw() const;
+	void SetEncyclopediaWidgetScale(float NewScale);
+	void SetEncyclopediaWidgetYaw(float NewYawDegrees);
 
 protected:
 	virtual void BeginPlay() override;
@@ -83,7 +89,7 @@ private:
 	TArray<USceneComponent*> EmblemPageComponents;
 
 	UPROPERTY()
-	TArray<USceneComponent*> CustomPageComponents;
+	TArray<USceneComponent*> EncyclopediaPageComponents;
 
 	UPROPERTY()
 	TArray<UTextRenderComponent*> MenuTexts;
@@ -101,6 +107,9 @@ private:
 	UWidgetComponent* WebsiteWidgetComponent;
 
 	UPROPERTY()
+	UWidgetComponent* EncyclopediaWidgetComponent;
+
+	UPROPERTY()
 	UMediaSoundComponent* WebsiteMediaSoundComponent;
 
 	FVector InitialLocation;
@@ -110,6 +119,8 @@ private:
 	float EmblemModelBaseFitScale;
 	float EmblemModelScale;
 	float EmblemModelYawDegrees;
+	float EncyclopediaWidgetScale;
+	float EncyclopediaWidgetYawDegrees;
 	ECampusCardPage CurrentPage;
 
 	void BuildMeshes();
@@ -117,9 +128,11 @@ private:
 	void BuildMenu();
 	void BuildPhotoWidget();
 	void BuildWebsiteWidget();
+	void BuildEncyclopediaWidget();
 	void BuildClickSound();
 	void SetupEmblemModel();
 	void ApplyEmblemModelTransform();
+	void ApplyEncyclopediaWidgetTransform();
 	void CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex = 0);
 	void CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVector& Extents, const FLinearColor& Color, int32 SectionIndex = 0);
 	void CreateCylinderMesh(UProceduralMeshComponent* Mesh, float Radius, float Height, const FLinearColor& Color, int32 Segments = 48, int32 SectionIndex = 0);

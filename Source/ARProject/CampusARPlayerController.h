@@ -32,9 +32,11 @@ private:
 	float ScaleAtPinchStart;
 	float CurrentCardScale;
 	float EmblemScaleAtPinchStart;
+	float EncyclopediaScaleAtPinchStart;
 	float YawOffsetDegrees;
 	float YawAtPinchStart;
 	float EmblemYawAtPinchStart;
+	float EncyclopediaYawAtPinchStart;
 	float AccumulatedTouchMove;
 	FVector CardLocalOffset;
 	FTransform LatestImageTransform;

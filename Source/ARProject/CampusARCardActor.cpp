@@ -1,5 +1,6 @@
 #include "CampusARCardActor.h"
 
+#include "CampusEncyclopediaWidget.h"
 #include "CampusPhotoWidget.h"
 #include "CampusVideoWidget.h"
 #include "Components/BoxComponent.h"
@@ -24,13 +25,22 @@ namespace
 	const FName ButtonTagProfile(TEXT("Profile"));
 	const FName ButtonTagWebsite(TEXT("Website"));
 	const FName ButtonTagEmblem(TEXT("Emblem"));
-	const FName ButtonTagCustom(TEXT("Custom"));
+	const FName ButtonTagEncyclopedia(TEXT("Encyclopedia"));
 	const FName ButtonTagReset(TEXT("Reset"));
 
 	const FLinearColor CityBlue(0.02f, 0.24f, 0.52f, 1.0f);
 	const FLinearColor CityLightBlue(0.58f, 0.78f, 0.96f, 1.0f);
 	const FLinearColor CityWhite(0.96f, 0.98f, 1.0f, 1.0f);
 	const FLinearColor CityInk(0.02f, 0.05f, 0.10f, 1.0f);
+	constexpr float ProfilePanelScale = 0.42f;
+	constexpr float ProfilePanelWidthScale = 1.80f;
+	constexpr float WebsitePageScale = 0.052f;
+	constexpr float EncyclopediaPageScale = 0.0775f;
+
+	FVector ScaleProfileLocation(const FVector& Location)
+	{
+		return FVector(Location.X * ProfilePanelScale, Location.Y * ProfilePanelScale * ProfilePanelWidthScale, Location.Z);
+	}
 
 	UMaterialInterface* LoadSolidColorMaterial()
 	{
@@ -95,13 +105,14 @@ ACampusARCardActor::ACampusARCardActor()
 	{
 		EmblemModelComponent->SetStaticMesh(EmblemModelAsset.Object);
 	}
-
-	CurrentPage = ECampusCardPage::Profile;
+	CurrentPage = ECampusCardPage::Emblem;
 	InitialScale = 1.0f;
 	CurrentScale = 1.0f;
 	EmblemModelBaseFitScale = 1.0f;
 	EmblemModelScale = 1.0f;
 	EmblemModelYawDegrees = 0.0f;
+	EncyclopediaWidgetScale = 1.0f;
+	EncyclopediaWidgetYawDegrees = 0.0f;
 }
 
 void ACampusARCardActor::BeginPlay()
@@ -118,6 +129,7 @@ void ACampusARCardActor::BeginPlay()
 	BuildMenu();
 	BuildPhotoWidget();
 	BuildWebsiteWidget();
+	BuildEncyclopediaWidget();
 	BuildClickSound();
 	SetupEmblemModel();
 	RefreshPageText();
@@ -162,6 +174,8 @@ void ACampusARCardActor::ResetCard()
 	SetCampusCardScale(InitialScale);
 	SetEmblemModelScale(1.0f);
 	SetEmblemModelYaw(0.0f);
+	SetEncyclopediaWidgetScale(1.0f);
+	SetEncyclopediaWidgetYaw(0.0f);
 	SetPage(ECampusCardPage::Profile);
 }
 
@@ -197,9 +211,9 @@ bool ACampusARCardActor::HandleWorldTap(const FVector& RayStart, const FVector& 
 			{
 				SetPage(ECampusCardPage::Emblem);
 			}
-			else if (ButtonTag == ButtonTagCustom)
+			else if (ButtonTag == ButtonTagEncyclopedia)
 			{
-				SetPage(ECampusCardPage::Custom);
+				SetPage(ECampusCardPage::Encyclopedia);
 			}
 			else if (ButtonTag == ButtonTagReset)
 			{
@@ -235,6 +249,11 @@ bool ACampusARCardActor::IsEmblemPage() const
 	return CurrentPage == ECampusCardPage::Emblem;
 }
 
+bool ACampusARCardActor::IsEncyclopediaPage() const
+{
+	return CurrentPage == ECampusCardPage::Encyclopedia;
+}
+
 float ACampusARCardActor::GetEmblemModelScale() const
 {
 	return EmblemModelScale;
@@ -260,6 +279,28 @@ void ACampusARCardActor::SetEmblemModelYaw(float NewYawDegrees)
 void ACampusARCardActor::AddEmblemModelYaw(float DeltaDegrees)
 {
 	SetEmblemModelYaw(EmblemModelYawDegrees + DeltaDegrees);
+}
+
+float ACampusARCardActor::GetEncyclopediaWidgetScale() const
+{
+	return EncyclopediaWidgetScale;
+}
+
+float ACampusARCardActor::GetEncyclopediaWidgetYaw() const
+{
+	return EncyclopediaWidgetYawDegrees;
+}
+
+void ACampusARCardActor::SetEncyclopediaWidgetScale(float NewScale)
+{
+	EncyclopediaWidgetScale = FMath::Clamp(NewScale, 0.55f, 2.5f);
+	ApplyEncyclopediaWidgetTransform();
+}
+
+void ACampusARCardActor::SetEncyclopediaWidgetYaw(float NewYawDegrees)
+{
+	EncyclopediaWidgetYawDegrees = FMath::UnwindDegrees(NewYawDegrees);
+	ApplyEncyclopediaWidgetTransform();
 }
 
 void ACampusARCardActor::BuildMeshes()
@@ -291,15 +332,15 @@ void ACampusARCardActor::BuildMeshes()
 		return PanelMesh;
 	};
 
-	AddFlatPanel(TEXT("ProfileLeftTint"), FVector(-43.0f, 2.0f, 1.82f), 42.0f, 68.0f, FLinearColor(0.96f, 0.91f, 0.95f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileRightTint"), FVector(37.0f, 14.0f, 1.83f), 50.0f, 46.0f, FLinearColor(0.91f, 0.73f, 0.84f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileCenterLight"), FVector(9.0f, -4.0f, 1.84f), 72.0f, 58.0f, FLinearColor(0.99f, 0.985f, 0.99f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileTitleBar"), FVector(-55.0f, -27.0f, 2.0f), 4.6f, 11.5f, FLinearColor(0.45f, 0.13f, 0.27f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfilePhotoFrame"), FVector(-40.0f, 14.0f, 2.0f), 29.0f, 38.0f, FLinearColor(0.98f, 0.98f, 0.985f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfilePhotoMatte"), FVector(-40.0f, 14.0f, 2.04f), 25.5f, 34.0f, FLinearColor(0.92f, 0.92f, 0.93f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileCityULogoPlate"), FVector(43.0f, -26.0f, 2.02f), 26.0f, 10.5f, FLinearColor(0.58f, 0.14f, 0.26f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileCityUAccent"), FVector(33.0f, -25.2f, 2.04f), 8.0f, 6.6f, FLinearColor(0.78f, 0.33f, 0.24f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileBottomLine"), FVector(0.0f, 39.2f, 2.0f), 122.0f, 0.7f, FLinearColor(0.18f, 0.17f, 0.18f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileLeftTint"), ScaleProfileLocation(FVector(-43.0f, 2.0f, 1.82f)), 42.0f * ProfilePanelScale, 68.0f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.96f, 0.91f, 0.95f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileRightTint"), ScaleProfileLocation(FVector(37.0f, 14.0f, 1.83f)), 50.0f * ProfilePanelScale, 46.0f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.91f, 0.73f, 0.84f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCenterLight"), ScaleProfileLocation(FVector(9.0f, -4.0f, 1.84f)), 72.0f * ProfilePanelScale, 58.0f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.99f, 0.985f, 0.99f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileTitleBar"), ScaleProfileLocation(FVector(-55.0f, -27.0f, 2.0f)), 4.6f * ProfilePanelScale, 11.5f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.45f, 0.13f, 0.27f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfilePhotoFrame"), ScaleProfileLocation(FVector(-12.0f, 6.0f, 2.0f)), 29.0f * ProfilePanelScale, 38.0f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.98f, 0.98f, 0.985f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfilePhotoMatte"), ScaleProfileLocation(FVector(-12.0f, 6.0f, 2.04f)), 25.5f * ProfilePanelScale, 34.0f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.92f, 0.92f, 0.93f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCityULogoPlate"), ScaleProfileLocation(FVector(43.0f, -26.0f, 2.02f)), 26.0f * ProfilePanelScale, 10.5f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.58f, 0.14f, 0.26f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCityUAccent"), ScaleProfileLocation(FVector(33.0f, -25.2f, 2.04f)), 8.0f * ProfilePanelScale, 6.6f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.78f, 0.33f, 0.24f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileBottomLine"), ScaleProfileLocation(FVector(0.0f, 39.2f, 2.0f)), 122.0f * ProfilePanelScale, 0.7f * ProfilePanelScale * ProfilePanelWidthScale, FLinearColor(0.18f, 0.17f, 0.18f, 1.0f), ProfilePageComponents);
 
 	UProceduralMeshComponent* EmblemOuter = NewObject<UProceduralMeshComponent>(this, TEXT("EmblemOuterRing"));
 	EmblemOuter->SetupAttachment(SceneRoot);
@@ -312,7 +353,6 @@ void ACampusARCardActor::BuildMeshes()
 	AddFlatPanel(TEXT("EmblemLabelPanel"), FVector(0.0f, 25.0f, 1.9f), 62.0f, 13.0f, FLinearColor(1.0f, 1.0f, 1.0f, 1.0f), EmblemPageComponents);
 	AddFlatPanel(TEXT("EmblemWaveA"), FVector(-4.5f, -1.0f, 5.4f), 20.0f, 3.0f, FLinearColor(0.72f, 0.86f, 0.96f, 1.0f), EmblemPageComponents);
 	AddFlatPanel(TEXT("EmblemWaveB"), FVector(4.5f, 4.0f, 5.5f), 18.0f, 3.0f, FLinearColor(0.96f, 0.98f, 1.0f, 1.0f), EmblemPageComponents);
-	AddFlatPanel(TEXT("CustomPanel"), FVector(0.0f, -1.0f, 1.8f), 90.0f, 44.0f, FLinearColor(0.98f, 0.99f, 1.0f, 1.0f), CustomPageComponents);
 }
 
 void ACampusARCardActor::BuildTexts()
@@ -324,35 +364,24 @@ void ACampusARCardActor::BuildTexts()
 		return TextComponent;
 	};
 
-	AddPageText(TEXT("ProfileStudentLabel"), TEXT("STUDENT"), FVector(-49.0f, -30.0f, 3.0f), 4.1f, FLinearColor(0.45f, 0.13f, 0.27f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileIdentityLabel"), TEXT("IDENTITY CARD"), FVector(-49.0f, -23.2f, 3.0f), 3.8f, FLinearColor(0.15f, 0.16f, 0.18f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileCityULogo"), TEXT("CityU"), FVector(33.2f, -27.8f, 3.0f), 4.3f, CityWhite, ProfilePageComponents);
-	AddPageText(TEXT("ProfileUniversityCn"), TEXT("香港城市大学（东莞）"), FVector(27.0f, -16.2f, 3.0f), 1.7f, FLinearColor(0.28f, 0.08f, 0.14f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileUniversityEn"), TEXT("City University of Hong Kong\n(Dongguan)"), FVector(27.0f, -12.8f, 3.0f), 1.35f, FLinearColor(0.35f, 0.07f, 0.14f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileName"), TEXT("Biaoyao ZHANG"), FVector(-4.0f, 3.0f, 3.0f), 4.0f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileNameCn"), TEXT("张飙垚"), FVector(-4.0f, 12.0f, 3.0f), 4.3f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileStudentId"), TEXT("72404867"), FVector(-4.0f, 25.8f, 3.0f), 3.6f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
-	AddPageText(TEXT("ProfileDegree"), TEXT("Postgraduate"), FVector(-4.0f, 34.2f, 3.0f), 3.2f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileDetails"), TEXT("Name: Biaoyao Zhang\nStudent ID: 72404867\nMajor: Computer Science\nLevel: Postgraduate"), ScaleProfileLocation(FVector(8.0f, -6.0f, 3.0f)), 5.2f * ProfilePanelScale, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
 
 	AddPageText(TEXT("EmblemTitle"), TEXT("School Emblem Model"), FVector(-27.0f, 22.0f, 3.0f), 3.0f, CityBlue, EmblemPageComponents);
 	AddPageText(TEXT("EmblemText"), TEXT("Drag to rotate. Pinch to scale or twist."), FVector(-28.0f, 28.0f, 3.0f), 1.9f, CityInk, EmblemPageComponents);
 	AddPageText(TEXT("EmblemCoreText"), TEXT("CITYUHK\nDG"), FVector(-7.5f, -9.0f, 6.0f), 3.0f, CityWhite, EmblemPageComponents);
-
-	AddPageText(TEXT("CustomTitle"), TEXT("Custom Page"), FVector(-33.0f, -14.0f, 3.0f), 4.0f, CityBlue, CustomPageComponents);
-	AddPageText(TEXT("CustomPlaceholder"), TEXT("Reserved for personal content,\nportfolio media, video, links,\nor future project display."), FVector(-33.0f, -3.0f, 3.0f), 2.5f, CityInk, CustomPageComponents);
 }
 
 void ACampusARCardActor::BuildMenu()
 {
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Profile"), FVector(-76.0f, -18.0f, 3.0f), 0));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Profile"), FVector(-76.0f, -23.0f, 3.0f), 0));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagProfile);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Website"), FVector(-76.0f, -6.5f, 3.0f), 1));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Intro"), FVector(-76.0f, -11.0f, 3.0f), 1));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagWebsite);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Emblem"), FVector(-76.0f, 5.0f, 3.0f), 2));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Emblem"), FVector(-76.0f, 1.0f, 3.0f), 2));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagEmblem);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Custom"), FVector(-76.0f, 16.5f, 3.0f), 3));
-	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagCustom);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Reset"), FVector(-76.0f, 30.0f, 3.0f), 4));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Wiki"), FVector(-76.0f, 13.0f, 3.0f), 3));
+	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagEncyclopedia);
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Reset"), FVector(-76.0f, 25.0f, 3.0f), 4));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagReset);
 }
 
@@ -366,9 +395,9 @@ void ACampusARCardActor::BuildPhotoWidget()
 	PhotoWidgetComponent->SetDrawSize(FVector2D(320.0f, 420.0f));
 	PhotoWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
 	PhotoWidgetComponent->SetTwoSided(true);
-	PhotoWidgetComponent->SetRelativeLocation(FVector(-40.0f, 14.0f, 3.0f));
+	PhotoWidgetComponent->SetRelativeLocation(ScaleProfileLocation(FVector(-12.0f, 6.0f, 3.0f)));
 	PhotoWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-	PhotoWidgetComponent->SetRelativeScale3D(FVector(0.080f));
+	PhotoWidgetComponent->SetRelativeScale3D(FVector(0.080f * ProfilePanelScale));
 	PhotoWidgetComponent->InitWidget();
 	ProfilePageComponents.Add(PhotoWidgetComponent);
 }
@@ -383,9 +412,9 @@ void ACampusARCardActor::BuildWebsiteWidget()
 	WebsiteWidgetComponent->SetDrawSize(FVector2D(1600.0f, 900.0f));
 	WebsiteWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
 	WebsiteWidgetComponent->SetTwoSided(true);
-	WebsiteWidgetComponent->SetRelativeLocation(FVector(4.0f, -1.0f, 3.35f));
+	WebsiteWidgetComponent->SetRelativeLocation(FVector(-4.0f, -1.0f, 3.35f));
 	WebsiteWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-	WebsiteWidgetComponent->SetRelativeScale3D(FVector(0.0775f));
+	WebsiteWidgetComponent->SetRelativeScale3D(FVector(WebsitePageScale));
 	WebsiteWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	WebsiteWidgetComponent->InitWidget();
 
@@ -402,6 +431,24 @@ void ACampusARCardActor::BuildWebsiteWidget()
 	WebsiteMediaSoundComponent->RegisterComponent();
 
 	WebsitePageComponents.Add(WebsiteWidgetComponent);
+}
+
+void ACampusARCardActor::BuildEncyclopediaWidget()
+{
+	EncyclopediaWidgetComponent = NewObject<UWidgetComponent>(this, TEXT("CampusEncyclopediaWidget"));
+	EncyclopediaWidgetComponent->SetupAttachment(SceneRoot);
+	EncyclopediaWidgetComponent->RegisterComponent();
+	EncyclopediaWidgetComponent->SetWidgetClass(UCampusEncyclopediaWidget::StaticClass());
+	EncyclopediaWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
+	EncyclopediaWidgetComponent->SetDrawSize(FVector2D(1500.0f, 900.0f));
+	EncyclopediaWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
+	EncyclopediaWidgetComponent->SetTwoSided(true);
+	EncyclopediaWidgetComponent->SetRelativeLocation(FVector(4.0f, -1.0f, 3.35f));
+	ApplyEncyclopediaWidgetTransform();
+	EncyclopediaWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	EncyclopediaWidgetComponent->InitWidget();
+
+	EncyclopediaPageComponents.Add(EncyclopediaWidgetComponent);
 }
 
 void ACampusARCardActor::BuildClickSound()
@@ -456,12 +503,10 @@ void ACampusARCardActor::SetupEmblemModel()
 	EmblemModelComponent->SetRelativeLocation(FVector(0.0f, -3.0f, 6.5f));
 	ApplyEmblemModelTransform();
 
-	LogoMesh->SetVisibility(false, true);
-	LogoMesh->SetHiddenInGame(true, true);
 	for (int32 ComponentIndex = EmblemPageComponents.Num() - 1; ComponentIndex >= 0; --ComponentIndex)
 	{
 		USceneComponent* Component = EmblemPageComponents[ComponentIndex];
-		if (Component == LogoMesh || (Component && Component->GetName() == TEXT("EmblemCoreText")))
+		if (Component && Component != EmblemModelComponent)
 		{
 			Component->SetVisibility(false, true);
 			Component->SetHiddenInGame(true, true);
@@ -480,6 +525,17 @@ void ACampusARCardActor::ApplyEmblemModelTransform()
 	const float FinalScale = EmblemModelBaseFitScale * EmblemModelScale;
 	EmblemModelComponent->SetRelativeScale3D(FVector(FinalScale));
 	EmblemModelComponent->SetRelativeRotation(FRotator(0.0f, EmblemModelYawDegrees, 0.0f));
+}
+
+void ACampusARCardActor::ApplyEncyclopediaWidgetTransform()
+{
+	if (!EncyclopediaWidgetComponent)
+	{
+		return;
+	}
+
+	EncyclopediaWidgetComponent->SetRelativeRotation(FRotator(90.0f, EncyclopediaWidgetYawDegrees, 0.0f));
+	EncyclopediaWidgetComponent->SetRelativeScale3D(FVector(EncyclopediaPageScale * EncyclopediaWidgetScale));
 }
 
 void ACampusARCardActor::CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex)
@@ -728,7 +784,13 @@ void ACampusARCardActor::SetPageComponentsVisible(const TArray<USceneComponent*>
 
 void ACampusARCardActor::RefreshPageText()
 {
-	const bool bShowCardBase = CurrentPage != ECampusCardPage::Website;
+	const bool bHasEmblemModel = EmblemModelComponent && EmblemModelComponent->GetStaticMesh();
+	const bool bShowCardBase = CurrentPage != ECampusCardPage::Website && CurrentPage != ECampusCardPage::Encyclopedia && !(CurrentPage == ECampusCardPage::Emblem && bHasEmblemModel);
+	const float CardBaseScale = CurrentPage == ECampusCardPage::Profile ? ProfilePanelScale : 1.0f;
+	const float CardBaseWidthScale = CurrentPage == ECampusCardPage::Profile ? ProfilePanelScale * ProfilePanelWidthScale : 1.0f;
+	MainCardMesh->SetRelativeScale3D(FVector(CardBaseScale, CardBaseWidthScale, 1.0f));
+	InfoPanelMesh->SetRelativeScale3D(FVector(CardBaseScale, CardBaseWidthScale, 1.0f));
+	BaseMesh->SetRelativeScale3D(FVector(CardBaseScale, CardBaseWidthScale, 1.0f));
 	MainCardMesh->SetVisibility(bShowCardBase, true);
 	MainCardMesh->SetHiddenInGame(!bShowCardBase, true);
 	BaseMesh->SetVisibility(bShowCardBase, true);
@@ -737,7 +799,7 @@ void ACampusARCardActor::RefreshPageText()
 	SetPageComponentsVisible(ProfilePageComponents, CurrentPage == ECampusCardPage::Profile);
 	SetPageComponentsVisible(WebsitePageComponents, CurrentPage == ECampusCardPage::Website);
 	SetPageComponentsVisible(EmblemPageComponents, CurrentPage == ECampusCardPage::Emblem);
-	SetPageComponentsVisible(CustomPageComponents, CurrentPage == ECampusCardPage::Custom);
+	SetPageComponentsVisible(EncyclopediaPageComponents, CurrentPage == ECampusCardPage::Encyclopedia);
 
 	if (WebsiteMediaSoundComponent)
 	{
