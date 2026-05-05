@@ -1,6 +1,7 @@
 #include "CampusARCardActor.h"
 
 #include "CampusPhotoWidget.h"
+#include "CampusVideoWidget.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -9,7 +10,9 @@
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "MediaSoundComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Sound/SoundWaveProcedural.h"
 #include "UObject/ConstructorHelpers.h"
@@ -27,10 +30,34 @@ namespace
 	const FLinearColor CityWhite(0.96f, 0.98f, 1.0f, 1.0f);
 	const FLinearColor CityInk(0.02f, 0.05f, 0.10f, 1.0f);
 
-	UMaterialInterface* LoadVertexColorMaterial()
+	UMaterialInterface* LoadSolidColorMaterial()
 	{
-		static UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
+		static UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 		return Material;
+	}
+
+	void ApplySolidColorMaterial(UProceduralMeshComponent* Mesh, int32 SectionIndex, const FLinearColor& Color)
+	{
+		if (!Mesh)
+		{
+			return;
+		}
+
+		UMaterialInterface* BaseMaterial = LoadSolidColorMaterial();
+		if (!BaseMaterial)
+		{
+			return;
+		}
+
+		UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh);
+		if (!DynamicMaterial)
+		{
+			return;
+		}
+
+		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), Color);
+		DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Color);
+		Mesh->SetMaterial(SectionIndex, DynamicMaterial);
 	}
 }
 
@@ -75,6 +102,7 @@ void ACampusARCardActor::BeginPlay()
 	BuildTexts();
 	BuildMenu();
 	BuildPhotoWidget();
+	BuildWebsiteWidget();
 	BuildClickSound();
 	RefreshPageText();
 }
@@ -183,15 +211,15 @@ void ACampusARCardActor::SetProfilePhoto(UTexture2D* PhotoTexture)
 
 void ACampusARCardActor::BuildMeshes()
 {
-	CreatePlaneMesh(MainCardMesh, 136.0f, 82.0f, FLinearColor(0.88f, 0.93f, 0.98f, 1.0f), false);
+	CreateRoundedRectMesh(MainCardMesh, 136.0f, 82.0f, 5.5f, FLinearColor(0.985f, 0.965f, 0.985f, 1.0f), 16);
 	MainCardMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 0.6f));
 
-	CreatePlaneMesh(InfoPanelMesh, 78.0f, 48.0f, CityWhite, false);
-	InfoPanelMesh->SetRelativeLocation(FVector(14.0f, -2.0f, 1.4f));
+	CreateRoundedRectMesh(InfoPanelMesh, 126.0f, 72.0f, 4.5f, FLinearColor(0.99f, 0.985f, 0.99f, 1.0f), 16);
+	InfoPanelMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 1.4f));
 	ProfilePageComponents.Add(InfoPanelMesh);
 
-	CreateBoxMesh(BaseMesh, FVector(66.0f, 40.0f, 0.45f), FLinearColor(0.72f, 0.82f, 0.91f, 1.0f));
-	BaseMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+	CreateRoundedRectMesh(BaseMesh, 137.0f, 83.0f, 5.8f, FLinearColor(0.18f, 0.17f, 0.18f, 1.0f), 16);
+	BaseMesh->SetRelativeLocation(FVector(0.8f, 1.0f, 0.0f));
 
 	CreateCylinderMesh(LogoMesh, 18.0f, 2.2f, CityBlue);
 	LogoMesh->SetRelativeLocation(FVector(0.0f, -3.0f, 4.0f));
@@ -209,20 +237,15 @@ void ACampusARCardActor::BuildMeshes()
 		return PanelMesh;
 	};
 
-	AddFlatPanel(TEXT("ProfilePhotoFrame"), FVector(-34.0f, -6.0f, 1.9f), 26.0f, 32.0f, FLinearColor(0.90f, 0.94f, 0.98f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileInfoCard"), FVector(19.0f, -5.0f, 1.9f), 45.0f, 32.0f, FLinearColor(0.98f, 0.99f, 1.0f, 1.0f), ProfilePageComponents);
-	AddFlatPanel(TEXT("ProfileBanner"), FVector(0.0f, -29.0f, 1.9f), 110.0f, 8.0f, CityBlue, ProfilePageComponents);
-
-	AddFlatPanel(TEXT("WebsiteTopNav"), FVector(26.0f, -23.5f, 1.8f), 78.0f, 5.5f, CityBlue, WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteHero"), FVector(17.0f, -6.0f, 1.9f), 44.0f, 18.0f, CityLightBlue, WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteHeroImage"), FVector(17.0f, -6.0f, 2.0f), 24.0f, 12.0f, FLinearColor(0.12f, 0.42f, 0.78f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteApplyCard"), FVector(49.0f, -6.0f, 1.9f), 20.0f, 18.0f, FLinearColor(0.92f, 0.96f, 1.0f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteAboutCard"), FVector(15.0f, 13.0f, 1.9f), 36.0f, 15.0f, FLinearColor(0.98f, 0.99f, 1.0f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteRankCardA"), FVector(43.0f, 10.0f, 1.9f), 18.0f, 10.0f, FLinearColor(0.89f, 0.94f, 1.0f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("WebsiteRankCardB"), FVector(43.0f, 22.0f, 1.9f), 18.0f, 10.0f, FLinearColor(0.89f, 0.94f, 1.0f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("LeftPreviewShip"), FVector(-48.0f, -17.0f, 1.7f), 27.0f, 16.0f, FLinearColor(0.06f, 0.34f, 0.68f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("LeftPreviewCampus"), FVector(-48.0f, 4.0f, 1.7f), 27.0f, 16.0f, FLinearColor(0.28f, 0.60f, 0.88f, 1.0f), WebsitePageComponents);
-	AddFlatPanel(TEXT("LeftPreviewResearch"), FVector(-48.0f, 25.0f, 1.7f), 27.0f, 16.0f, FLinearColor(0.78f, 0.88f, 0.97f, 1.0f), WebsitePageComponents);
+	AddFlatPanel(TEXT("ProfileLeftTint"), FVector(-43.0f, 2.0f, 1.82f), 42.0f, 68.0f, FLinearColor(0.96f, 0.91f, 0.95f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileRightTint"), FVector(37.0f, 14.0f, 1.83f), 50.0f, 46.0f, FLinearColor(0.91f, 0.73f, 0.84f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCenterLight"), FVector(9.0f, -4.0f, 1.84f), 72.0f, 58.0f, FLinearColor(0.99f, 0.985f, 0.99f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileTitleBar"), FVector(-55.0f, -27.0f, 2.0f), 4.6f, 11.5f, FLinearColor(0.45f, 0.13f, 0.27f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfilePhotoFrame"), FVector(-40.0f, 14.0f, 2.0f), 29.0f, 38.0f, FLinearColor(0.98f, 0.98f, 0.985f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfilePhotoMatte"), FVector(-40.0f, 14.0f, 2.04f), 25.5f, 34.0f, FLinearColor(0.92f, 0.92f, 0.93f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCityULogoPlate"), FVector(43.0f, -26.0f, 2.02f), 26.0f, 10.5f, FLinearColor(0.58f, 0.14f, 0.26f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileCityUAccent"), FVector(33.0f, -25.2f, 2.04f), 8.0f, 6.6f, FLinearColor(0.78f, 0.33f, 0.24f, 1.0f), ProfilePageComponents);
+	AddFlatPanel(TEXT("ProfileBottomLine"), FVector(0.0f, 39.2f, 2.0f), 122.0f, 0.7f, FLinearColor(0.18f, 0.17f, 0.18f, 1.0f), ProfilePageComponents);
 
 	UProceduralMeshComponent* EmblemOuter = NewObject<UProceduralMeshComponent>(this, TEXT("EmblemOuterRing"));
 	EmblemOuter->SetupAttachment(SceneRoot);
@@ -247,27 +270,15 @@ void ACampusARCardActor::BuildTexts()
 		return TextComponent;
 	};
 
-	AddPageText(TEXT("ProfileTitle"), TEXT("Student Profile"), FVector(-47.0f, -30.0f, 3.0f), 3.6f, CityWhite, ProfilePageComponents);
-	AddPageText(TEXT("ProfileName"), TEXT("Name: Gavin Cheung"), FVector(0.0f, -16.5f, 3.0f), 3.3f, CityBlue, ProfilePageComponents);
-	AddPageText(TEXT("ProfileStudentId"), TEXT("Student ID: 2026 AR Demo"), FVector(0.0f, -8.5f, 3.0f), 2.4f, CityInk, ProfilePageComponents);
-	AddPageText(TEXT("ProfileDegree"), TEXT("Level: Postgraduate"), FVector(0.0f, -2.5f, 3.0f), 2.4f, CityInk, ProfilePageComponents);
-	AddPageText(TEXT("ProfileSchool"), TEXT("City University of Hong Kong (Dongguan)"), FVector(0.0f, 4.0f, 3.0f), 2.1f, CityInk, ProfilePageComponents);
-	AddPageText(TEXT("ProfileHint"), TEXT("Tap the buttons below to switch AR content."), FVector(-46.0f, 23.0f, 3.0f), 2.0f, FLinearColor(0.20f, 0.28f, 0.38f), ProfilePageComponents);
-
-	AddPageText(TEXT("WebsiteBrand"), TEXT("City University of Hong Kong (Dongguan)"), FVector(-53.0f, -35.0f, 3.0f), 3.6f, CityBlue, WebsitePageComponents);
-	AddPageText(TEXT("WebsiteUrl"), TEXT("www.cityu-dg.edu.cn/en/home.html"), FVector(-18.0f, -29.8f, 3.0f), 2.0f, FLinearColor(0.18f, 0.26f, 0.38f), WebsitePageComponents);
-	AddPageText(TEXT("WebsiteNav"), TEXT("Home    About Us    Academic    Research    Campus    Contact"), FVector(-6.0f, -23.8f, 3.1f), 1.8f, CityWhite, WebsitePageComponents);
-	AddPageText(TEXT("LeftLabelShip"), TEXT("News"), FVector(-59.0f, -13.0f, 3.0f), 2.4f, CityWhite, WebsitePageComponents);
-	AddPageText(TEXT("LeftLabelCampus"), TEXT("Life at CityUHK (DG)"), FVector(-59.0f, 8.0f, 3.0f), 2.0f, CityWhite, WebsitePageComponents);
-	AddPageText(TEXT("LeftLabelResearch"), TEXT("Research"), FVector(-59.0f, 29.0f, 3.0f), 2.2f, CityBlue, WebsitePageComponents);
-	AddPageText(TEXT("HeroTitle"), TEXT("Thrive at the Heart of the GBA"), FVector(-2.5f, -12.0f, 3.0f), 2.5f, CityWhite, WebsitePageComponents);
-	AddPageText(TEXT("HeroSubtitle"), TEXT("A modern research university in Dongguan"), FVector(-2.5f, -7.8f, 3.0f), 1.6f, CityWhite, WebsitePageComponents);
-	AddPageText(TEXT("ApplyNow"), TEXT("Apply Now"), FVector(42.0f, -9.0f, 3.0f), 3.0f, CityBlue, WebsitePageComponents);
-	AddPageText(TEXT("ApplyText"), TEXT("Admissions and\nprogram updates"), FVector(41.0f, -3.5f, 3.0f), 1.6f, CityInk, WebsitePageComponents);
-	AddPageText(TEXT("AboutPreview"), TEXT("About Us"), FVector(0.0f, 9.0f, 3.0f), 2.4f, CityBlue, WebsitePageComponents);
-	AddPageText(TEXT("AboutPreviewText"), TEXT("CityUHK (DG) connects global education,\ninnovation, and the Greater Bay Area."), FVector(0.0f, 14.2f, 3.0f), 1.5f, CityInk, WebsitePageComponents);
-	AddPageText(TEXT("RankingA"), TEXT("#54\nBest Global\nUniversities"), FVector(36.0f, 7.8f, 3.0f), 1.75f, CityBlue, WebsitePageComponents);
-	AddPageText(TEXT("RankingB"), TEXT("#7\nQS Asia University\nRankings"), FVector(36.0f, 19.8f, 3.0f), 1.75f, CityBlue, WebsitePageComponents);
+	AddPageText(TEXT("ProfileStudentLabel"), TEXT("STUDENT"), FVector(-49.0f, -30.0f, 3.0f), 4.1f, FLinearColor(0.45f, 0.13f, 0.27f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileIdentityLabel"), TEXT("IDENTITY CARD"), FVector(-49.0f, -23.2f, 3.0f), 3.8f, FLinearColor(0.15f, 0.16f, 0.18f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileCityULogo"), TEXT("CityU"), FVector(33.2f, -27.8f, 3.0f), 4.3f, CityWhite, ProfilePageComponents);
+	AddPageText(TEXT("ProfileUniversityCn"), TEXT("香港城市大学（东莞）"), FVector(27.0f, -16.2f, 3.0f), 1.7f, FLinearColor(0.28f, 0.08f, 0.14f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileUniversityEn"), TEXT("City University of Hong Kong\n(Dongguan)"), FVector(27.0f, -12.8f, 3.0f), 1.35f, FLinearColor(0.35f, 0.07f, 0.14f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileName"), TEXT("Biaoyao ZHANG"), FVector(-4.0f, 3.0f, 3.0f), 4.0f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileNameCn"), TEXT("张飙垚"), FVector(-4.0f, 12.0f, 3.0f), 4.3f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileStudentId"), TEXT("72404867"), FVector(-4.0f, 25.8f, 3.0f), 3.6f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
+	AddPageText(TEXT("ProfileDegree"), TEXT("Postgraduate"), FVector(-4.0f, 34.2f, 3.0f), 3.2f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
 
 	AddPageText(TEXT("EmblemTitle"), TEXT("School Emblem Model"), FVector(-27.0f, 22.0f, 3.0f), 3.0f, CityBlue, EmblemPageComponents);
 	AddPageText(TEXT("EmblemText"), TEXT("Use two fingers to scale or rotate the AR emblem."), FVector(-28.0f, 28.0f, 3.0f), 1.9f, CityInk, EmblemPageComponents);
@@ -279,15 +290,15 @@ void ACampusARCardActor::BuildTexts()
 
 void ACampusARCardActor::BuildMenu()
 {
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Profile"), FVector(-34.0f, 36.0f, 3.0f), 0));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Profile"), FVector(-76.0f, -18.0f, 3.0f), 0));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagProfile);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Website"), FVector(-14.0f, 36.0f, 3.0f), 1));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Website"), FVector(-76.0f, -6.5f, 3.0f), 1));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagWebsite);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Emblem"), FVector(6.0f, 36.0f, 3.0f), 2));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Emblem"), FVector(-76.0f, 5.0f, 3.0f), 2));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagEmblem);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Custom"), FVector(26.0f, 36.0f, 3.0f), 3));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Custom"), FVector(-76.0f, 16.5f, 3.0f), 3));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagCustom);
-	MenuHitBoxes.Add(AddMenuButton(TEXT("Reset"), FVector(52.0f, 36.0f, 3.0f), 4));
+	MenuHitBoxes.Add(AddMenuButton(TEXT("Reset"), FVector(-76.0f, 30.0f, 3.0f), 4));
 	MenuHitBoxes.Last()->ComponentTags.Add(ButtonTagReset);
 }
 
@@ -301,11 +312,42 @@ void ACampusARCardActor::BuildPhotoWidget()
 	PhotoWidgetComponent->SetDrawSize(FVector2D(320.0f, 420.0f));
 	PhotoWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
 	PhotoWidgetComponent->SetTwoSided(true);
-	PhotoWidgetComponent->SetRelativeLocation(FVector(-34.0f, -6.0f, 3.0f));
+	PhotoWidgetComponent->SetRelativeLocation(FVector(-40.0f, 14.0f, 3.0f));
 	PhotoWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-	PhotoWidgetComponent->SetRelativeScale3D(FVector(0.075f));
+	PhotoWidgetComponent->SetRelativeScale3D(FVector(0.080f));
 	PhotoWidgetComponent->InitWidget();
 	ProfilePageComponents.Add(PhotoWidgetComponent);
+}
+
+void ACampusARCardActor::BuildWebsiteWidget()
+{
+	WebsiteWidgetComponent = NewObject<UWidgetComponent>(this, TEXT("WebsiteVideoWidget"));
+	WebsiteWidgetComponent->SetupAttachment(SceneRoot);
+	WebsiteWidgetComponent->RegisterComponent();
+	WebsiteWidgetComponent->SetWidgetClass(UCampusVideoWidget::StaticClass());
+	WebsiteWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
+	WebsiteWidgetComponent->SetDrawSize(FVector2D(1600.0f, 900.0f));
+	WebsiteWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
+	WebsiteWidgetComponent->SetTwoSided(true);
+	WebsiteWidgetComponent->SetRelativeLocation(FVector(4.0f, -1.0f, 3.35f));
+	WebsiteWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
+	WebsiteWidgetComponent->SetRelativeScale3D(FVector(0.0775f));
+	WebsiteWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WebsiteWidgetComponent->InitWidget();
+
+	WebsiteMediaSoundComponent = NewObject<UMediaSoundComponent>(this, TEXT("WebsiteMediaSoundComponent"));
+	WebsiteMediaSoundComponent->SetupAttachment(WebsiteWidgetComponent);
+	WebsiteMediaSoundComponent->bAutoActivate = false;
+	WebsiteMediaSoundComponent->bAllowSpatialization = false;
+	WebsiteMediaSoundComponent->bIsUISound = true;
+	WebsiteMediaSoundComponent->SetVolumeMultiplier(1.0f);
+	if (UCampusVideoWidget* VideoWidget = Cast<UCampusVideoWidget>(WebsiteWidgetComponent->GetUserWidgetObject()))
+	{
+		WebsiteMediaSoundComponent->SetMediaPlayer(VideoWidget->GetMediaPlayer());
+	}
+	WebsiteMediaSoundComponent->RegisterComponent();
+
+	WebsitePageComponents.Add(WebsiteWidgetComponent);
 }
 
 void ACampusARCardActor::BuildClickSound()
@@ -361,10 +403,7 @@ void ACampusARCardActor::CreatePlaneMesh(UProceduralMeshComponent* Mesh, float W
 	const TArray<FProcMeshTangent> Tangents = { FProcMeshTangent(1.0f, 0.0f, 0.0f), FProcMeshTangent(1.0f, 0.0f, 0.0f), FProcMeshTangent(1.0f, 0.0f, 0.0f), FProcMeshTangent(1.0f, 0.0f, 0.0f) };
 
 	Mesh->CreateMeshSection(SectionIndex, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
-	if (UMaterialInterface* Material = LoadVertexColorMaterial())
-	{
-		Mesh->SetMaterial(SectionIndex, Material);
-	}
+	ApplySolidColorMaterial(Mesh, SectionIndex, Color);
 }
 
 void ACampusARCardActor::CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVector& Extents, const FLinearColor& Color, int32 SectionIndex)
@@ -397,10 +436,7 @@ void ACampusARCardActor::CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVe
 	}
 
 	Mesh->CreateMeshSection(SectionIndex, V, T, N, UV, C, Tangents, false);
-	if (UMaterialInterface* Material = LoadVertexColorMaterial())
-	{
-		Mesh->SetMaterial(SectionIndex, Material);
-	}
+	ApplySolidColorMaterial(Mesh, SectionIndex, Color);
 }
 
 void ACampusARCardActor::CreateCylinderMesh(UProceduralMeshComponent* Mesh, float Radius, float Height, const FLinearColor& Color, int32 Segments, int32 SectionIndex)
@@ -462,10 +498,65 @@ void ACampusARCardActor::CreateCylinderMesh(UProceduralMeshComponent* Mesh, floa
 	}
 
 	Mesh->CreateMeshSection(SectionIndex, Vertices, Triangles, Normals, UV, Colors, Tangents, false);
-	if (UMaterialInterface* Material = LoadVertexColorMaterial())
+	ApplySolidColorMaterial(Mesh, SectionIndex, Color);
+}
+
+void ACampusARCardActor::CreateRoundedRectMesh(UProceduralMeshComponent* Mesh, float Width, float Height, float Radius, const FLinearColor& Color, int32 SegmentsPerCorner, int32 SectionIndex)
+{
+	if (!Mesh)
 	{
-		Mesh->SetMaterial(SectionIndex, Material);
+		return;
 	}
+
+	const float HalfW = Width * 0.5f;
+	const float HalfH = Height * 0.5f;
+	const float ClampedRadius = FMath::Clamp(Radius, 0.0f, FMath::Min(HalfW, HalfH));
+	const int32 ClampedSegments = FMath::Max(SegmentsPerCorner, 3);
+
+	TArray<FVector> Vertices;
+	Vertices.Add(FVector::ZeroVector);
+
+	auto AddCorner = [&Vertices, ClampedRadius, ClampedSegments](const FVector2D& Center, float StartDegrees, float EndDegrees)
+	{
+		for (int32 SegmentIndex = 0; SegmentIndex <= ClampedSegments; ++SegmentIndex)
+		{
+			const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(ClampedSegments);
+			const float AngleRadians = FMath::DegreesToRadians(FMath::Lerp(StartDegrees, EndDegrees, Alpha));
+			Vertices.Add(FVector(
+				Center.X + FMath::Cos(AngleRadians) * ClampedRadius,
+				Center.Y + FMath::Sin(AngleRadians) * ClampedRadius,
+				0.0f));
+		}
+	};
+
+	AddCorner(FVector2D(HalfW - ClampedRadius, HalfH - ClampedRadius), 0.0f, 90.0f);
+	AddCorner(FVector2D(-HalfW + ClampedRadius, HalfH - ClampedRadius), 90.0f, 180.0f);
+	AddCorner(FVector2D(-HalfW + ClampedRadius, -HalfH + ClampedRadius), 180.0f, 270.0f);
+	AddCorner(FVector2D(HalfW - ClampedRadius, -HalfH + ClampedRadius), 270.0f, 360.0f);
+
+	TArray<int32> Triangles;
+	for (int32 VertexIndex = 1; VertexIndex < Vertices.Num(); ++VertexIndex)
+	{
+		const int32 NextVertexIndex = VertexIndex == Vertices.Num() - 1 ? 1 : VertexIndex + 1;
+		Triangles.Add(0);
+		Triangles.Add(NextVertexIndex);
+		Triangles.Add(VertexIndex);
+	}
+
+	TArray<FVector> Normals;
+	TArray<FVector2D> UV;
+	TArray<FColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	for (const FVector& Vertex : Vertices)
+	{
+		Normals.Add(FVector::UpVector);
+		UV.Add(FVector2D((Vertex.X + HalfW) / Width, (Vertex.Y + HalfH) / Height));
+		Colors.Add(Color.ToFColor(true));
+		Tangents.Add(FProcMeshTangent(1.0f, 0.0f, 0.0f));
+	}
+
+	Mesh->CreateMeshSection(SectionIndex, Vertices, Triangles, Normals, UV, Colors, Tangents, false);
+	ApplySolidColorMaterial(Mesh, SectionIndex, Color);
 }
 
 UTextRenderComponent* ACampusARCardActor::AddText(const FString& Name, const FString& Text, const FVector& Location, float Size, const FLinearColor& Color)
@@ -488,18 +579,18 @@ UBoxComponent* ACampusARCardActor::AddMenuButton(const FString& Label, const FVe
 	UProceduralMeshComponent* ButtonMesh = NewObject<UProceduralMeshComponent>(this, *FString::Printf(TEXT("ButtonMesh_%s"), *Label));
 	ButtonMesh->SetupAttachment(SceneRoot);
 	ButtonMesh->RegisterComponent();
-	ButtonMesh->SetRelativeLocation(Location + FVector(2.0f, -1.0f, 0.0f));
+	ButtonMesh->SetRelativeLocation(Location);
 	ButtonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CreateBoxMesh(ButtonMesh, FVector(7.6f, 3.2f, 0.45f), FLinearColor(1.0f, 1.0f, 1.0f, 1.0f), ButtonIndex);
+	CreateRoundedRectMesh(ButtonMesh, 16.8f, 7.2f, 3.6f, FLinearColor::White, 12, ButtonIndex);
 
-	UTextRenderComponent* MenuText = AddText(FString::Printf(TEXT("Menu_%s"), *Label), Label, Location + FVector(-5.4f, 0.0f, 0.75f), 1.9f, CityBlue);
+	UTextRenderComponent* MenuText = AddText(FString::Printf(TEXT("Menu_%s"), *Label), Label, Location + FVector(-5.8f, 0.5f, 0.85f), 1.45f, FLinearColor::Black);
 	MenuTexts.Add(MenuText);
 
 	UBoxComponent* HitBox = NewObject<UBoxComponent>(this, *FString::Printf(TEXT("Hit_%s"), *Label));
 	HitBox->SetupAttachment(SceneRoot);
 	HitBox->RegisterComponent();
-	HitBox->SetRelativeLocation(Location + FVector(2.0f, -1.0f, 0.0f));
-	HitBox->SetBoxExtent(FVector(8.0f, 4.0f, 2.0f));
+	HitBox->SetRelativeLocation(Location);
+	HitBox->SetBoxExtent(FVector(8.8f, 4.0f, 2.0f));
 	HitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	HitBox->SetCollisionObjectType(ECC_WorldDynamic);
 	HitBox->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -529,10 +620,39 @@ void ACampusARCardActor::SetPageComponentsVisible(const TArray<USceneComponent*>
 
 void ACampusARCardActor::RefreshPageText()
 {
+	const bool bShowCardBase = CurrentPage != ECampusCardPage::Website;
+	MainCardMesh->SetVisibility(bShowCardBase, true);
+	MainCardMesh->SetHiddenInGame(!bShowCardBase, true);
+	BaseMesh->SetVisibility(bShowCardBase, true);
+	BaseMesh->SetHiddenInGame(!bShowCardBase, true);
+
 	SetPageComponentsVisible(ProfilePageComponents, CurrentPage == ECampusCardPage::Profile);
 	SetPageComponentsVisible(WebsitePageComponents, CurrentPage == ECampusCardPage::Website);
 	SetPageComponentsVisible(EmblemPageComponents, CurrentPage == ECampusCardPage::Emblem);
 	SetPageComponentsVisible(CustomPageComponents, CurrentPage == ECampusCardPage::Custom);
+
+	if (WebsiteMediaSoundComponent)
+	{
+		if (CurrentPage == ECampusCardPage::Website)
+		{
+			WebsiteMediaSoundComponent->Activate(true);
+			if (UCampusVideoWidget* VideoWidget = Cast<UCampusVideoWidget>(WebsiteWidgetComponent->GetUserWidgetObject()))
+			{
+				VideoWidget->OpenMedia();
+			}
+		}
+		else
+		{
+			if (WebsiteWidgetComponent)
+			{
+				if (UCampusVideoWidget* VideoWidget = Cast<UCampusVideoWidget>(WebsiteWidgetComponent->GetUserWidgetObject()))
+				{
+					VideoWidget->CloseMedia();
+				}
+			}
+			WebsiteMediaSoundComponent->Deactivate();
+		}
+	}
 }
 
 void ACampusARCardActor::PlayIntroSound()

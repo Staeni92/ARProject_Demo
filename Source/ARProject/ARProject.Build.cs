@@ -16,6 +16,7 @@ public class ARProject : ModuleRules
 			"UMG",
 			"Slate",
 			"SlateCore",
+			"MediaAssets",
 			"AudioMixer",
 			"ImageWrapper",
 			"RenderCore"

@@ -6,6 +6,8 @@
 
 class UBoxComponent;
 class UCampusPhotoWidget;
+class UCampusVideoWidget;
+class UMediaSoundComponent;
 class UProceduralMeshComponent;
 class USceneComponent;
 class USoundWaveProcedural;
@@ -85,6 +87,12 @@ private:
 	UPROPERTY()
 	UWidgetComponent* PhotoWidgetComponent;
 
+	UPROPERTY()
+	UWidgetComponent* WebsiteWidgetComponent;
+
+	UPROPERTY()
+	UMediaSoundComponent* WebsiteMediaSoundComponent;
+
 	FVector InitialLocation;
 	FRotator InitialRotation;
 	float InitialScale;
@@ -95,10 +103,12 @@ private:
 	void BuildTexts();
 	void BuildMenu();
 	void BuildPhotoWidget();
+	void BuildWebsiteWidget();
 	void BuildClickSound();
 	void CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex = 0);
 	void CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVector& Extents, const FLinearColor& Color, int32 SectionIndex = 0);
 	void CreateCylinderMesh(UProceduralMeshComponent* Mesh, float Radius, float Height, const FLinearColor& Color, int32 Segments = 48, int32 SectionIndex = 0);
+	void CreateRoundedRectMesh(UProceduralMeshComponent* Mesh, float Width, float Height, float Radius, const FLinearColor& Color, int32 SegmentsPerCorner = 10, int32 SectionIndex = 0);
 	UTextRenderComponent* AddText(const FString& Name, const FString& Text, const FVector& Location, float Size, const FLinearColor& Color);
 	UBoxComponent* AddMenuButton(const FString& Label, const FVector& Location, int32 ButtonIndex);
 	void SetPage(ECampusCardPage NewPage);
