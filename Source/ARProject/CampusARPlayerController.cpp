@@ -26,9 +26,16 @@ ACampusARPlayerController::ACampusARPlayerController()
 	CampusCard = nullptr;
 	bWasTouch1Down = false;
 	bWasTouch2Down = false;
+	PinchStartVector = FVector2D::ZeroVector;
 	LastPinchDistance = 0.0f;
 	ScaleAtPinchStart = 1.0f;
+	CurrentCardScale = 1.0f;
+	YawOffsetDegrees = 0.0f;
+	YawAtPinchStart = 0.0f;
 	AccumulatedTouchMove = 0.0f;
+	CardLocalOffset = FVector::ZeroVector;
+	LatestImageTransform = FTransform::Identity;
+	bHasLatestImageTransform = false;
 	RuntimeImageSessionConfig = nullptr;
 	MarkerTexture = nullptr;
 	ProfilePhotoTexture = nullptr;
@@ -111,19 +118,21 @@ void ACampusARPlayerController::PollTrackedCampusCard()
 		FTransform ImageTransform = TrackedImage->GetLocalToWorldTransform();
 		ImageTransform.SetScale3D(FVector(0.8f));
 		ImageTransform.ConcatenateRotation(FQuat(FRotator(0.0f, 0.0f, 0.0f)));
+		LatestImageTransform = ImageTransform;
+		bHasLatestImageTransform = true;
 
 		if (!CampusCard)
 		{
 			SpawnCardAtTransform(ImageTransform);
 			if (CampusCard)
 			{
+				CurrentCardScale = CampusCard->GetActorScale3D().X;
 				CampusCard->SetProfilePhoto(ProfilePhotoTexture);
 			}
 		}
 		else
 		{
-			CampusCard->SetActorLocation(ImageTransform.GetLocation());
-			CampusCard->SetActorRotation(ImageTransform.GetRotation());
+			ApplyCampusCardManipulation();
 		}
 
 		return;
@@ -195,23 +204,35 @@ void ACampusARPlayerController::UpdateTouchInput()
 	if (bTouch1Down && bTouch2Down)
 	{
 		const float CurrentDistance = FVector2D::Distance(Touch1, Touch2);
+		const FVector2D CurrentPinchVector = Touch2 - Touch1;
 		if (!bWasTouch2Down)
 		{
 			LastPinchDistance = CurrentDistance;
-			ScaleAtPinchStart = CampusCard ? CampusCard->GetActorScale3D().X : 1.0f;
+			PinchStartVector = CurrentPinchVector;
+			ScaleAtPinchStart = CurrentCardScale;
+			YawAtPinchStart = YawOffsetDegrees;
 		}
 		else if (CampusCard && LastPinchDistance > 1.0f)
 		{
 			const float ScaleFactor = CurrentDistance / LastPinchDistance;
-			CampusCard->SetCampusCardScale(ScaleAtPinchStart * ScaleFactor);
+			CurrentCardScale = FMath::Clamp(ScaleAtPinchStart * ScaleFactor, 0.45f, 2.2f);
+
+			if (!PinchStartVector.IsNearlyZero() && !CurrentPinchVector.IsNearlyZero())
+			{
+				const float Cross = (PinchStartVector.X * CurrentPinchVector.Y) - (PinchStartVector.Y * CurrentPinchVector.X);
+				const float Dot = FVector2D::DotProduct(PinchStartVector, CurrentPinchVector);
+				YawOffsetDegrees = YawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot));
+			}
+
+			ApplyCampusCardManipulation();
 		}
 	}
 	else if (bTouch1Down && bWasTouch1Down && CampusCard)
 	{
 		const FVector2D Delta = Touch1 - LastTouch1;
 		AccumulatedTouchMove += Delta.Size();
-		CampusCard->AddYaw(Delta.X * 0.18f);
-		CampusCard->AddLocalOffsetFromGesture(FVector2D(Delta.X, Delta.Y) * 0.25f);
+		CardLocalOffset += FVector(Delta.X * 0.035f, -Delta.Y * 0.035f, 0.0f);
+		ApplyCampusCardManipulation();
 	}
 
 	if (!bTouch1Down && bWasTouch1Down && !bWasTouch2Down && AccumulatedTouchMove < 18.0f)
@@ -255,7 +276,13 @@ bool ACampusARPlayerController::TryTapMenu(const FVector2D& ScreenPosition)
 	}
 
 	const FVector RayEnd = WorldOrigin + WorldDirection * 10000.0f;
-	return CampusCard && CampusCard->HandleWorldTap(WorldOrigin, RayEnd);
+	bool bResetRequested = false;
+	const bool bHandled = CampusCard && CampusCard->HandleWorldTap(WorldOrigin, RayEnd, &bResetRequested);
+	if (bResetRequested)
+	{
+		ResetCampusCardManipulation();
+	}
+	return bHandled;
 }
 
 bool ACampusARPlayerController::TryPlaceCampusCard(const FVector2D& ScreenPosition)
@@ -283,6 +310,34 @@ void ACampusARPlayerController::SpawnCardAtTransform(const FTransform& SpawnTran
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	CampusCard = GetWorld()->SpawnActor<ACampusARCardActor>(ACampusARCardActor::StaticClass(), SpawnTransform, SpawnParams);
+	if (CampusCard)
+	{
+		CurrentCardScale = SpawnTransform.GetScale3D().X;
+	}
+}
+
+void ACampusARPlayerController::ApplyCampusCardManipulation()
+{
+	if (!CampusCard || !bHasLatestImageTransform)
+	{
+		return;
+	}
+
+	const FVector ManipulatedLocation = LatestImageTransform.TransformPosition(CardLocalOffset);
+	const FQuat ManipulatedRotation = LatestImageTransform.GetRotation() * FQuat(FRotator(0.0f, YawOffsetDegrees, 0.0f));
+
+	CampusCard->SetActorLocation(ManipulatedLocation);
+	CampusCard->SetActorRotation(ManipulatedRotation);
+	CampusCard->SetCampusCardScale(CurrentCardScale);
+}
+
+void ACampusARPlayerController::ResetCampusCardManipulation()
+{
+	CardLocalOffset = FVector::ZeroVector;
+	YawOffsetDegrees = 0.0f;
+	YawAtPinchStart = 0.0f;
+	CurrentCardScale = bHasLatestImageTransform ? LatestImageTransform.GetScale3D().X : 1.0f;
+	ApplyCampusCardManipulation();
 }
 
 FTransform ACampusARPlayerController::GetFallbackCameraTransform() const

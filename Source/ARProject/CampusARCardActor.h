@@ -17,9 +17,9 @@ UENUM()
 enum class ECampusCardPage : uint8
 {
 	Profile,
-	Skills,
-	Projects,
-	Contact
+	Website,
+	Emblem,
+	Custom
 };
 
 UCLASS()
@@ -36,7 +36,7 @@ public:
 	void AddYaw(float DeltaDegrees);
 	void AddLocalOffsetFromGesture(const FVector2D& ScreenDelta);
 	void ResetCard();
-	bool HandleWorldTap(const FVector& RayStart, const FVector& RayEnd);
+	bool HandleWorldTap(const FVector& RayStart, const FVector& RayEnd, bool* bOutResetRequested = nullptr);
 	void SetProfilePhoto(UTexture2D* PhotoTexture);
 
 protected:
@@ -60,6 +60,18 @@ private:
 
 	UPROPERTY()
 	TArray<UTextRenderComponent*> PageTexts;
+
+	UPROPERTY()
+	TArray<USceneComponent*> ProfilePageComponents;
+
+	UPROPERTY()
+	TArray<USceneComponent*> WebsitePageComponents;
+
+	UPROPERTY()
+	TArray<USceneComponent*> EmblemPageComponents;
+
+	UPROPERTY()
+	TArray<USceneComponent*> CustomPageComponents;
 
 	UPROPERTY()
 	TArray<UTextRenderComponent*> MenuTexts;
@@ -86,9 +98,11 @@ private:
 	void BuildClickSound();
 	void CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex = 0);
 	void CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVector& Extents, const FLinearColor& Color, int32 SectionIndex = 0);
+	void CreateCylinderMesh(UProceduralMeshComponent* Mesh, float Radius, float Height, const FLinearColor& Color, int32 Segments = 48, int32 SectionIndex = 0);
 	UTextRenderComponent* AddText(const FString& Name, const FString& Text, const FVector& Location, float Size, const FLinearColor& Color);
 	UBoxComponent* AddMenuButton(const FString& Label, const FVector& Location, int32 ButtonIndex);
 	void SetPage(ECampusCardPage NewPage);
+	void SetPageComponentsVisible(const TArray<USceneComponent*>& Components, bool bVisible);
 	void RefreshPageText();
 	void PlayIntroSound();
 };

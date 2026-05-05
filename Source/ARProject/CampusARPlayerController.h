@@ -27,9 +27,16 @@ private:
 	bool bWasTouch2Down;
 	FVector2D LastTouch1;
 	FVector2D LastTouch2;
+	FVector2D PinchStartVector;
 	float LastPinchDistance;
 	float ScaleAtPinchStart;
+	float CurrentCardScale;
+	float YawOffsetDegrees;
+	float YawAtPinchStart;
 	float AccumulatedTouchMove;
+	FVector CardLocalOffset;
+	FTransform LatestImageTransform;
+	bool bHasLatestImageTransform;
 
 	UPROPERTY()
 	UARSessionConfig* RuntimeImageSessionConfig;
@@ -50,5 +57,7 @@ private:
 	bool TryTapMenu(const FVector2D& ScreenPosition);
 	bool TryPlaceCampusCard(const FVector2D& ScreenPosition);
 	void SpawnCardAtTransform(const FTransform& SpawnTransform);
+	void ApplyCampusCardManipulation();
+	void ResetCampusCardManipulation();
 	FTransform GetFallbackCameraTransform() const;
 };
