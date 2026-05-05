@@ -7,6 +7,7 @@
 #include "Components/TextRenderComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Engine/CollisionProfile.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,6 +16,7 @@
 #include "MediaSoundComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Sound/SoundWaveProcedural.h"
+#include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -84,9 +86,22 @@ ACampusARCardActor::ACampusARCardActor()
 	LogoMesh->SetupAttachment(SceneRoot);
 	LogoMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	EmblemModelComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("EmblemModel"));
+	EmblemModelComponent->SetupAttachment(SceneRoot);
+	EmblemModelComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	EmblemModelComponent->SetMobility(EComponentMobility::Movable);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> EmblemModelAsset(TEXT("/Game/Emblem/Optimized/Hitem3d-1778001575323_optimized/StaticMeshes/Hitem3d_1778001575323_Optimized.Hitem3d_1778001575323_Optimized"));
+	if (EmblemModelAsset.Succeeded())
+	{
+		EmblemModelComponent->SetStaticMesh(EmblemModelAsset.Object);
+	}
+
 	CurrentPage = ECampusCardPage::Profile;
 	InitialScale = 1.0f;
 	CurrentScale = 1.0f;
+	EmblemModelBaseFitScale = 1.0f;
+	EmblemModelScale = 1.0f;
+	EmblemModelYawDegrees = 0.0f;
 }
 
 void ACampusARCardActor::BeginPlay()
@@ -104,6 +119,7 @@ void ACampusARCardActor::BeginPlay()
 	BuildPhotoWidget();
 	BuildWebsiteWidget();
 	BuildClickSound();
+	SetupEmblemModel();
 	RefreshPageText();
 }
 
@@ -113,13 +129,16 @@ void ACampusARCardActor::Tick(float DeltaSeconds)
 
 	if (CurrentPage == ECampusCardPage::Emblem)
 	{
-		LogoMesh->SetRelativeRotation(LogoMesh->GetRelativeRotation() + FRotator(0.0f, DeltaSeconds * 30.0f, 0.0f));
+		if (!EmblemModelComponent || !EmblemModelComponent->GetStaticMesh())
+		{
+			LogoMesh->SetRelativeRotation(LogoMesh->GetRelativeRotation() + FRotator(0.0f, DeltaSeconds * 30.0f, 0.0f));
+		}
 	}
 }
 
 void ACampusARCardActor::SetCampusCardScale(float NewScale)
 {
-	CurrentScale = FMath::Clamp(NewScale, 0.45f, 2.2f);
+	CurrentScale = FMath::Clamp(NewScale, 0.30f, 2.2f);
 	SetActorScale3D(FVector(CurrentScale));
 }
 
@@ -141,6 +160,8 @@ void ACampusARCardActor::ResetCard()
 	SetActorLocation(InitialLocation);
 	SetActorRotation(InitialRotation);
 	SetCampusCardScale(InitialScale);
+	SetEmblemModelScale(1.0f);
+	SetEmblemModelYaw(0.0f);
 	SetPage(ECampusCardPage::Profile);
 }
 
@@ -209,6 +230,38 @@ void ACampusARCardActor::SetProfilePhoto(UTexture2D* PhotoTexture)
 	}
 }
 
+bool ACampusARCardActor::IsEmblemPage() const
+{
+	return CurrentPage == ECampusCardPage::Emblem;
+}
+
+float ACampusARCardActor::GetEmblemModelScale() const
+{
+	return EmblemModelScale;
+}
+
+float ACampusARCardActor::GetEmblemModelYaw() const
+{
+	return EmblemModelYawDegrees;
+}
+
+void ACampusARCardActor::SetEmblemModelScale(float NewScale)
+{
+	EmblemModelScale = FMath::Clamp(NewScale, 0.45f, 2.8f);
+	ApplyEmblemModelTransform();
+}
+
+void ACampusARCardActor::SetEmblemModelYaw(float NewYawDegrees)
+{
+	EmblemModelYawDegrees = FMath::UnwindDegrees(NewYawDegrees);
+	ApplyEmblemModelTransform();
+}
+
+void ACampusARCardActor::AddEmblemModelYaw(float DeltaDegrees)
+{
+	SetEmblemModelYaw(EmblemModelYawDegrees + DeltaDegrees);
+}
+
 void ACampusARCardActor::BuildMeshes()
 {
 	CreateRoundedRectMesh(MainCardMesh, 136.0f, 82.0f, 5.5f, FLinearColor(0.985f, 0.965f, 0.985f, 1.0f), 16);
@@ -224,6 +277,7 @@ void ACampusARCardActor::BuildMeshes()
 	CreateCylinderMesh(LogoMesh, 18.0f, 2.2f, CityBlue);
 	LogoMesh->SetRelativeLocation(FVector(0.0f, -3.0f, 4.0f));
 	EmblemPageComponents.Add(LogoMesh);
+	EmblemPageComponents.Add(EmblemModelComponent);
 
 	auto AddFlatPanel = [this](const FString& Name, const FVector& Location, float Width, float Height, const FLinearColor& Color, TArray<USceneComponent*>& PageComponents)
 	{
@@ -281,7 +335,7 @@ void ACampusARCardActor::BuildTexts()
 	AddPageText(TEXT("ProfileDegree"), TEXT("Postgraduate"), FVector(-4.0f, 34.2f, 3.0f), 3.2f, FLinearColor(0.13f, 0.14f, 0.16f, 1.0f), ProfilePageComponents);
 
 	AddPageText(TEXT("EmblemTitle"), TEXT("School Emblem Model"), FVector(-27.0f, 22.0f, 3.0f), 3.0f, CityBlue, EmblemPageComponents);
-	AddPageText(TEXT("EmblemText"), TEXT("Use two fingers to scale or rotate the AR emblem."), FVector(-28.0f, 28.0f, 3.0f), 1.9f, CityInk, EmblemPageComponents);
+	AddPageText(TEXT("EmblemText"), TEXT("Drag to rotate. Pinch to scale or twist."), FVector(-28.0f, 28.0f, 3.0f), 1.9f, CityInk, EmblemPageComponents);
 	AddPageText(TEXT("EmblemCoreText"), TEXT("CITYUHK\nDG"), FVector(-7.5f, -9.0f, 6.0f), 3.0f, CityWhite, EmblemPageComponents);
 
 	AddPageText(TEXT("CustomTitle"), TEXT("Custom Page"), FVector(-33.0f, -14.0f, 3.0f), 4.0f, CityBlue, CustomPageComponents);
@@ -373,6 +427,59 @@ void ACampusARCardActor::BuildClickSound()
 	ClickSound->SampleByteSize = sizeof(int16);
 	ClickSound->bLooping = false;
 	ClickSound->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+}
+
+void ACampusARCardActor::SetupEmblemModel()
+{
+	if (!EmblemModelComponent)
+	{
+		return;
+	}
+
+	UStaticMesh* EmblemMesh = EmblemModelComponent->GetStaticMesh();
+	if (!EmblemMesh)
+	{
+		EmblemMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Emblem/Optimized/Hitem3d-1778001575323_optimized/StaticMeshes/Hitem3d_1778001575323_Optimized.Hitem3d_1778001575323_Optimized"));
+	}
+	if (!EmblemMesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Emblem model mesh was not loaded. Falling back to generated logo mesh."));
+		EmblemModelComponent->SetVisibility(false, true);
+		EmblemModelComponent->SetHiddenInGame(true, true);
+		return;
+	}
+
+	EmblemModelComponent->SetStaticMesh(EmblemMesh);
+	const FBoxSphereBounds Bounds = EmblemMesh->GetBounds();
+	const float MaxExtent = Bounds.BoxExtent.GetMax();
+	EmblemModelBaseFitScale = MaxExtent > KINDA_SMALL_NUMBER ? 22.0f / MaxExtent : 1.0f;
+	EmblemModelComponent->SetRelativeLocation(FVector(0.0f, -3.0f, 6.5f));
+	ApplyEmblemModelTransform();
+
+	LogoMesh->SetVisibility(false, true);
+	LogoMesh->SetHiddenInGame(true, true);
+	for (int32 ComponentIndex = EmblemPageComponents.Num() - 1; ComponentIndex >= 0; --ComponentIndex)
+	{
+		USceneComponent* Component = EmblemPageComponents[ComponentIndex];
+		if (Component == LogoMesh || (Component && Component->GetName() == TEXT("EmblemCoreText")))
+		{
+			Component->SetVisibility(false, true);
+			Component->SetHiddenInGame(true, true);
+			EmblemPageComponents.RemoveAt(ComponentIndex);
+		}
+	}
+}
+
+void ACampusARCardActor::ApplyEmblemModelTransform()
+{
+	if (!EmblemModelComponent)
+	{
+		return;
+	}
+
+	const float FinalScale = EmblemModelBaseFitScale * EmblemModelScale;
+	EmblemModelComponent->SetRelativeScale3D(FVector(FinalScale));
+	EmblemModelComponent->SetRelativeRotation(FRotator(0.0f, EmblemModelYawDegrees, 0.0f));
 }
 
 void ACampusARCardActor::CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex)
@@ -581,9 +688,10 @@ UBoxComponent* ACampusARCardActor::AddMenuButton(const FString& Label, const FVe
 	ButtonMesh->RegisterComponent();
 	ButtonMesh->SetRelativeLocation(Location);
 	ButtonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CreateRoundedRectMesh(ButtonMesh, 16.8f, 7.2f, 3.6f, FLinearColor::White, 12, ButtonIndex);
+	CreateRoundedRectMesh(ButtonMesh, 18.8f, 7.8f, 3.4f, CityBlue, 12, ButtonIndex);
 
-	UTextRenderComponent* MenuText = AddText(FString::Printf(TEXT("Menu_%s"), *Label), Label, Location + FVector(-5.8f, 0.5f, 0.85f), 1.45f, FLinearColor::Black);
+	UTextRenderComponent* MenuText = AddText(FString::Printf(TEXT("Menu_%s"), *Label), Label, Location + FVector(0.0f, 0.4f, 1.45f), 1.9f, CityWhite);
+	MenuText->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);
 	MenuTexts.Add(MenuText);
 
 	UBoxComponent* HitBox = NewObject<UBoxComponent>(this, *FString::Printf(TEXT("Hit_%s"), *Label));

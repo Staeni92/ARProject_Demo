@@ -11,6 +11,7 @@ class UMediaSoundComponent;
 class UProceduralMeshComponent;
 class USceneComponent;
 class USoundWaveProcedural;
+class UStaticMeshComponent;
 class UTextRenderComponent;
 class UTexture2D;
 class UWidgetComponent;
@@ -40,6 +41,12 @@ public:
 	void ResetCard();
 	bool HandleWorldTap(const FVector& RayStart, const FVector& RayEnd, bool* bOutResetRequested = nullptr);
 	void SetProfilePhoto(UTexture2D* PhotoTexture);
+	bool IsEmblemPage() const;
+	float GetEmblemModelScale() const;
+	float GetEmblemModelYaw() const;
+	void SetEmblemModelScale(float NewScale);
+	void SetEmblemModelYaw(float NewYawDegrees);
+	void AddEmblemModelYaw(float DeltaDegrees);
 
 protected:
 	virtual void BeginPlay() override;
@@ -59,6 +66,9 @@ private:
 
 	UPROPERTY()
 	UProceduralMeshComponent* LogoMesh;
+
+	UPROPERTY()
+	UStaticMeshComponent* EmblemModelComponent;
 
 	UPROPERTY()
 	TArray<UTextRenderComponent*> PageTexts;
@@ -97,6 +107,9 @@ private:
 	FRotator InitialRotation;
 	float InitialScale;
 	float CurrentScale;
+	float EmblemModelBaseFitScale;
+	float EmblemModelScale;
+	float EmblemModelYawDegrees;
 	ECampusCardPage CurrentPage;
 
 	void BuildMeshes();
@@ -105,6 +118,8 @@ private:
 	void BuildPhotoWidget();
 	void BuildWebsiteWidget();
 	void BuildClickSound();
+	void SetupEmblemModel();
+	void ApplyEmblemModelTransform();
 	void CreatePlaneMesh(UProceduralMeshComponent* Mesh, float Width, float Height, const FLinearColor& Color, bool bVertical, int32 SectionIndex = 0);
 	void CreateBoxMesh(UProceduralMeshComponent* Mesh, const FVector& Extents, const FLinearColor& Color, int32 SectionIndex = 0);
 	void CreateCylinderMesh(UProceduralMeshComponent* Mesh, float Radius, float Height, const FLinearColor& Color, int32 Segments = 48, int32 SectionIndex = 0);

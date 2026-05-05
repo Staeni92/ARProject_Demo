@@ -16,6 +16,11 @@
 #include "TimerManager.h"
 #include "TextureResource.h"
 
+namespace
+{
+	constexpr float DefaultCampusCardScale = 0.55f;
+}
+
 ACampusARPlayerController::ACampusARPlayerController()
 {
 	bEnableTouchEvents = true;
@@ -30,8 +35,10 @@ ACampusARPlayerController::ACampusARPlayerController()
 	LastPinchDistance = 0.0f;
 	ScaleAtPinchStart = 1.0f;
 	CurrentCardScale = 1.0f;
+	EmblemScaleAtPinchStart = 1.0f;
 	YawOffsetDegrees = 0.0f;
 	YawAtPinchStart = 0.0f;
+	EmblemYawAtPinchStart = 0.0f;
 	AccumulatedTouchMove = 0.0f;
 	CardLocalOffset = FVector::ZeroVector;
 	LatestImageTransform = FTransform::Identity;
@@ -116,8 +123,8 @@ void ACampusARPlayerController::PollTrackedCampusCard()
 		}
 
 		FTransform ImageTransform = TrackedImage->GetLocalToWorldTransform();
-		ImageTransform.SetScale3D(FVector(0.8f));
-		ImageTransform.ConcatenateRotation(FQuat(FRotator(0.0f, 0.0f, 0.0f)));
+		ImageTransform.SetScale3D(FVector(DefaultCampusCardScale));
+		ImageTransform.ConcatenateRotation(FQuat(FRotator(0.0f, 180.0f, 0.0f)));
 		LatestImageTransform = ImageTransform;
 		bHasLatestImageTransform = true;
 
@@ -205,34 +212,64 @@ void ACampusARPlayerController::UpdateTouchInput()
 	{
 		const float CurrentDistance = FVector2D::Distance(Touch1, Touch2);
 		const FVector2D CurrentPinchVector = Touch2 - Touch1;
+		const bool bManipulateEmblemModel = CampusCard && CampusCard->IsEmblemPage();
 		if (!bWasTouch2Down)
 		{
 			LastPinchDistance = CurrentDistance;
 			PinchStartVector = CurrentPinchVector;
 			ScaleAtPinchStart = CurrentCardScale;
 			YawAtPinchStart = YawOffsetDegrees;
+			if (CampusCard)
+			{
+				EmblemScaleAtPinchStart = CampusCard->GetEmblemModelScale();
+				EmblemYawAtPinchStart = CampusCard->GetEmblemModelYaw();
+			}
 		}
 		else if (CampusCard && LastPinchDistance > 1.0f)
 		{
 			const float ScaleFactor = CurrentDistance / LastPinchDistance;
-			CurrentCardScale = FMath::Clamp(ScaleAtPinchStart * ScaleFactor, 0.45f, 2.2f);
+			if (bManipulateEmblemModel)
+			{
+				CampusCard->SetEmblemModelScale(EmblemScaleAtPinchStart * ScaleFactor);
+			}
+			else
+			{
+				CurrentCardScale = FMath::Clamp(ScaleAtPinchStart * ScaleFactor, 0.30f, 2.2f);
+			}
 
 			if (!PinchStartVector.IsNearlyZero() && !CurrentPinchVector.IsNearlyZero())
 			{
 				const float Cross = (PinchStartVector.X * CurrentPinchVector.Y) - (PinchStartVector.Y * CurrentPinchVector.X);
 				const float Dot = FVector2D::DotProduct(PinchStartVector, CurrentPinchVector);
-				YawOffsetDegrees = YawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot));
+				if (bManipulateEmblemModel)
+				{
+					CampusCard->SetEmblemModelYaw(EmblemYawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot)));
+				}
+				else
+				{
+					YawOffsetDegrees = YawAtPinchStart + FMath::RadiansToDegrees(FMath::Atan2(Cross, Dot));
+				}
 			}
 
-			ApplyCampusCardManipulation();
+			if (!bManipulateEmblemModel)
+			{
+				ApplyCampusCardManipulation();
+			}
 		}
 	}
 	else if (bTouch1Down && bWasTouch1Down && CampusCard)
 	{
 		const FVector2D Delta = Touch1 - LastTouch1;
 		AccumulatedTouchMove += Delta.Size();
-		CardLocalOffset += FVector(Delta.X * 0.035f, -Delta.Y * 0.035f, 0.0f);
-		ApplyCampusCardManipulation();
+		if (CampusCard->IsEmblemPage())
+		{
+			CampusCard->AddEmblemModelYaw(Delta.X * 0.35f);
+		}
+		else
+		{
+			CardLocalOffset += FVector(Delta.X * 0.035f, -Delta.Y * 0.035f, 0.0f);
+			ApplyCampusCardManipulation();
+		}
 	}
 
 	if (!bTouch1Down && bWasTouch1Down && !bWasTouch2Down && AccumulatedTouchMove < 18.0f)
@@ -291,7 +328,7 @@ bool ACampusARPlayerController::TryPlaceCampusCard(const FVector2D& ScreenPositi
 	if (TraceResults.Num() > 0)
 	{
 		FTransform SpawnTransform = TraceResults[0].GetLocalToWorldTransform();
-		SpawnTransform.SetScale3D(FVector(1.0f));
+		SpawnTransform.SetScale3D(FVector(DefaultCampusCardScale));
 		SpawnCardAtTransform(SpawnTransform);
 		return true;
 	}
@@ -336,7 +373,14 @@ void ACampusARPlayerController::ResetCampusCardManipulation()
 	CardLocalOffset = FVector::ZeroVector;
 	YawOffsetDegrees = 0.0f;
 	YawAtPinchStart = 0.0f;
-	CurrentCardScale = bHasLatestImageTransform ? LatestImageTransform.GetScale3D().X : 1.0f;
+	EmblemScaleAtPinchStart = 1.0f;
+	EmblemYawAtPinchStart = 0.0f;
+	CurrentCardScale = bHasLatestImageTransform ? LatestImageTransform.GetScale3D().X : DefaultCampusCardScale;
+	if (CampusCard)
+	{
+		CampusCard->SetEmblemModelScale(1.0f);
+		CampusCard->SetEmblemModelYaw(0.0f);
+	}
 	ApplyCampusCardManipulation();
 }
 
@@ -353,5 +397,5 @@ FTransform ACampusARPlayerController::GetFallbackCameraTransform() const
 	const FVector Forward = CameraRotation.Vector();
 	const FVector SpawnLocation = CameraLocation + Forward * 120.0f + FVector(0.0f, 0.0f, -25.0f);
 	const FRotator SpawnRotation(0.0f, CameraRotation.Yaw + 180.0f, 0.0f);
-	return FTransform(SpawnRotation, SpawnLocation, FVector(1.0f));
+	return FTransform(SpawnRotation, SpawnLocation, FVector(DefaultCampusCardScale));
 }
