@@ -18,7 +18,9 @@
 | --- | --- | --- | --- | --- |
 | Biaoyao Zhang (张飙垚) | 72404867 | Implemented and refined the Unreal Engine AR application, including image tracking, AR object generation, touch interaction, page switching, profile photo loading, website preview, school emblem display, encyclopedia page, and runtime connection between image recognition and the generated AR card. | Wrote and organized the project report, README, setup notes, feature description, screen capture evidence notes, development effort summary, and demo guide. | Planned the project scope, selected assets, organized implementation order, tested the project, checked required resources, coordinated final packaging, and prepared the final submission materials. |
 
----
+
+
+
 
 ## Application Description
 
@@ -33,9 +35,9 @@ Main files and resources used in the implementation:
 - Website/introduction video: `Content/Movies/campus-preview.mp4`
 - School emblem model: `Content/Emblem/Optimized/Hitem3d-1778001575323_optimized/StaticMeshes/Hitem3d_1778001575323_Optimized.uasset`
 - Main AR object code: `Source/ARProject/CampusARCardActor.cpp`
-- AR tracking and gesture code: `Source/ARProject/CampusARPlayerController.cpp`
+- AR tracking and gesture code: `Source/ARProject/CampusARPlayerController.cpp
 
----
+
 
 ## Windows Demo to macOS + iOS Debugging Adaptation Summary
 
@@ -63,6 +65,8 @@ if (Target.Platform == UnrealTargetPlatform.IOS)
 ```
 
 After these changes, the project can be developed on macOS, signed through Xcode, packaged with local cooked content, installed on an iOS device, and launched into the AR map for real ARKit testing.
+
+
 
 ---
 
